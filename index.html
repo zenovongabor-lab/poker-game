@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0b3d2e" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>Pocket Poker</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== HOME / SETUP SCREEN ===== -->
+  <section id="home" class="screen active">
+    <div class="home-inner">
+      <div class="logo">
+        <div class="logo-suits">
+          <span class="s-red">&hearts;</span><span>&spades;</span><span class="s-red">&diams;</span><span>&clubs;</span>
+        </div>
+        <h1>Pocket Poker</h1>
+        <p class="tagline">Texas Hold'em, in your pocket</p>
+      </div>
+
+      <div class="setup card-panel">
+        <h2>New Game</h2>
+
+        <label class="field">
+          <span>Mode</span>
+          <div class="seg" id="modeSeg">
+            <button data-mode="ai" class="active">vs&nbsp;AI</button>
+            <button data-mode="pass">Pass&nbsp;&amp;&nbsp;Play</button>
+          </div>
+        </label>
+
+        <label class="field" id="opponentsField">
+          <span>Opponents</span>
+          <div class="seg" id="oppSeg">
+            <button data-opp="1" class="active">1</button>
+            <button data-opp="2">2</button>
+            <button data-opp="3">3</button>
+          </div>
+        </label>
+
+        <label class="field" id="humansField" style="display:none">
+          <span>Players</span>
+          <div class="seg" id="humanSeg">
+            <button data-humans="2" class="active">2</button>
+            <button data-humans="3">3</button>
+            <button data-humans="4">4</button>
+          </div>
+        </label>
+
+        <label class="field">
+          <span>Starting chips</span>
+          <div class="seg" id="stackSeg">
+            <button data-stack="500">500</button>
+            <button data-stack="1000" class="active">1,000</button>
+            <button data-stack="2500">2,500</button>
+          </div>
+        </label>
+
+        <label class="field">
+          <span>Small blind</span>
+          <div class="seg" id="blindSeg">
+            <button data-blind="5">5</button>
+            <button data-blind="10" class="active">10</button>
+            <button data-blind="25">25</button>
+          </div>
+        </label>
+
+        <button id="startBtn" class="btn-primary big">Deal In</button>
+      </div>
+
+      <p class="hint">Tip: In Pass &amp; Play, hand the phone to the next player and tap <b>Peek</b> to see your cards.</p>
+    </div>
+  </section>
+
+  <!-- ===== TABLE SCREEN ===== -->
+  <section id="table" class="screen">
+    <div class="table-top">
+      <button id="menuBtn" class="icon-btn" title="Menu">&#9776;</button>
+      <div class="pot-display">
+        <div class="pot-label">POT</div>
+        <div class="pot-amount" id="potAmount">0</div>
+      </div>
+      <div class="stage-badge" id="stageBadge">Pre-Flop</div>
+    </div>
+
+    <div class="felt">
+      <div class="board" id="board"><!-- community cards --></div>
+      <div class="seats" id="seats"><!-- opponent/other seats --></div>
+      <div id="tableMsg" class="table-msg"></div>
+    </div>
+
+    <div class="you" id="youSeat"><!-- the acting player's seat --></div>
+
+    <div class="controls" id="controls">
+      <!-- Action buttons injected here -->
+    </div>
+  </section>
+
+  <!-- ===== MODAL (menu / results) ===== -->
+  <div id="modal" class="modal-overlay">
+    <div class="modal-box card-panel">
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+</div>
+<script src="game.js"></script>
+</body>
+</html>

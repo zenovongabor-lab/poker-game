@@ -46,6 +46,39 @@ twice the small blind. Play continues until one player holds all the chips.
 | `index.html` | Markup and screen structure |
 | `style.css`  | All styling (mobile-first, safe-area aware, dark felt theme) |
 | `game.js`    | Game engine, hand evaluator, AI, and UI logic — no dependencies |
+| `tests.js`   | Automated test suite (run with Node) |
+
+## Testing
+
+```bash
+node tests.js
+```
+
+The suite validates the engine against a full Texas Hold'em ruleset:
+
+- **Deck** — 52 unique cards, correct 4×13 structure, shuffle preserves the deck,
+  first-card distribution is roughly uniform (unbiased Fisher–Yates).
+- **Hand evaluation** — every category is recognised and correctly ordered, with
+  exhaustive tie-break checks (kickers, full-house trips-first, quad kickers, flush
+  ordering) and the ace-low **wheel** (`A-2-3-4-5` is five-high; `6-5-4-3-2` beats it).
+  Suits never break ties.
+- **Best 5 of 7** — board-plays, and hands using two / one / zero hole cards.
+- **Side pots** — main/side splits, folded contributors, multiple all-in levels,
+  tied side pots with a different main-pot winner, and chip conservation across
+  5,000 randomised settlements.
+- **Odd chips** — a genuinely indivisible split awards the extra chip to the seat
+  closest clockwise from the dealer, and follows the button when it moves.
+- **Betting** — check/bet/call/raise/re-raise/fold/all-in, minimum-raise tracking,
+  and the rule that a **short all-in does not reopen betting** for players who have
+  already acted.
+- **Exact frequencies** — a full enumeration of all `C(52,5) = 2,598,960` hands is
+  categorised by the evaluator and checked against the known combinatorial counts
+  (4 royal flushes, 624 quads, 1,302,540 high-card hands, …). This is the definitive
+  correctness check for the hand evaluator.
+
+Beyond the unit suite, the game is exercised end-to-end in a headless browser —
+full games are played to completion in both modes, asserting no runtime errors and
+that total chips are conserved on every step.
 
 ## Under the hood
 

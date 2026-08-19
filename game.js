@@ -326,15 +326,20 @@ function applyAction(idx, action, amount){
     p.lastAction = p.allIn ? 'allin' : 'call';
   } else if (action === 'bet' || action === 'raise'){
     // amount = total this-street bet the player is moving to
+    const prevBet = G.currentBet;
     const target = Math.min(amount, p.bet + p.stack);
     const put = target - p.bet;
     p.stack -= put; p.bet = target; p.totalBet += put; G.pot += put;
-    const raiseSize = p.bet - G.currentBet;
-    if (raiseSize >= G.minRaise) G.minRaise = raiseSize;
-    G.currentBet = Math.max(G.currentBet, p.bet);
     if (p.stack === 0) p.allIn = true;
-    // a genuine raise re-opens action
-    for (const q of G.players) if (q !== p && !q.folded && !q.allIn && !q.out) q.acted = false;
+    const raiseSize = p.bet - prevBet;
+    // A full (legal-sized) raise reopens betting; a short all-in raise does NOT
+    // reopen action for players who have already acted (Texas Hold'em rule, §16).
+    const isFullRaise = raiseSize >= G.minRaise;
+    if (isFullRaise) G.minRaise = raiseSize;
+    G.currentBet = Math.max(prevBet, p.bet);
+    if (isFullRaise){
+      for (const q of G.players) if (q !== p && !q.folded && !q.allIn && !q.out) q.acted = false;
+    }
     p.lastAction = p.allIn ? 'allin' : (action === 'bet' ? 'bet' : 'raise');
   }
 
@@ -416,6 +421,40 @@ function buildPots(){
 }
 function sameSet(a, b){ return a.length === b.length && a.every(x => b.includes(x)); }
 
+// Order player ids clockwise from the dealer (small blind seat first) so odd
+// chips in a split pot go to the earliest such player (§38).
+function orderFromDealer(ids){
+  const n = G.players.length;
+  const seat = id => G.players.findIndex(p => p.id === id);
+  return ids.slice().sort((a, b) => ((seat(a) - G.dealer - 1 + n) % n) - ((seat(b) - G.dealer - 1 + n) % n));
+}
+
+// Pure settlement: given built pots and each contender's hand score, return
+// { payouts:{id->chips}, refunds:{id->chips}, results:[...] }. No mutation.
+function computePayouts(pots, scores){
+  const payouts = {}, refunds = {}, results = [];
+  for (const pot of pots){
+    const contenders = pot.eligible.filter(id => scores[id] !== undefined);
+    if (contenders.length === 0){
+      // No eligible winner (uncalled chips): refund to this layer's contributors.
+      for (const id of pot.contributors) refunds[id] = (refunds[id] || 0) + pot.seg;
+      continue;
+    }
+    let best = null;
+    for (const id of contenders) if (best === null || cmpScore(scores[id], scores[best]) > 0) best = id;
+    const winners = orderFromDealer(contenders.filter(id => cmpScore(scores[id], scores[best]) === 0));
+    const share = Math.floor(pot.amount / winners.length);
+    let rem = pot.amount - share * winners.length; // odd chips
+    for (const id of winners){
+      let amt = share;
+      if (rem > 0){ amt++; rem--; } // extra chip to earliest seat from dealer
+      payouts[id] = (payouts[id] || 0) + amt;
+    }
+    results.push({ amount: pot.amount, winners, name: handName(scores[best]) });
+  }
+  return { payouts, refunds, results };
+}
+
 function showdown(){
   if (!G.handLive) return;
   G.handLive = false;
@@ -424,33 +463,13 @@ function showdown(){
   const scores = {};
   for (const p of inHand()) scores[p.id] = bestOf7(p.cards.concat(G.board));
 
-  const pots = buildPots();
-  const winnings = {};
-  const potResults = [];
-  for (const pot of pots){
-    const contenders = pot.eligible.filter(id => scores[id]);
-    if (contenders.length === 0){
-      // No eligible winner (uncalled chips): refund to this layer's contributors.
-      for (const id of pot.contributors) G.players.find(p => p.id === id).stack += pot.seg;
-      continue;
-    }
-    let best = null;
-    for (const id of contenders) if (!best || cmpScore(scores[id], scores[best]) > 0) best = id;
-    const winners = contenders.filter(id => cmpScore(scores[id], scores[best]) === 0);
-    const share = Math.floor(pot.amount / winners.length);
-    let rem = pot.amount - share * winners.length;
-    for (const id of winners){
-      let amt = share;
-      if (rem > 0){ amt++; rem--; }
-      winnings[id] = (winnings[id] || 0) + amt;
-      G.players.find(p => p.id === id).stack += amt;
-    }
-    potResults.push({ amount: pot.amount, winners, name: handName(scores[best]) });
-  }
-  for (const p of G.players) if (winnings[p.id]) markWinner(p.id);
+  const { payouts, refunds, results } = computePayouts(buildPots(), scores);
+  const byId = id => G.players.find(p => String(p.id) === String(id));
+  for (const id in payouts){ byId(id).stack += payouts[id]; markWinner(byId(id).id); }
+  for (const id in refunds){ byId(id).stack += refunds[id]; }
   G.pot = 0;
   renderTable();
-  showShowdownModal(scores, potResults, winnings);
+  showShowdownModal(scores, results, payouts);
 }
 
 function awardUncontested(){
@@ -522,7 +541,7 @@ function aiAct(p){
   } else {
     if (equity > potOdds + 0.10){
       // strong enough to continue; sometimes raise
-      const canRaise = p.stack > callAmt;
+      const canRaise = p.stack > callAmt && !p.acted; // short all-in doesn't reopen (§16)
       if (canRaise && (equity > 0.80 || (equity > 0.64 && rnd < 0.45) || (bluff && rnd < 0.5))){
         action = 'raise';
         const size = equity > 0.85 ? 0.95 : 0.6;
@@ -533,7 +552,7 @@ function aiAct(p){
       }
     } else if (equity > potOdds - 0.03 && callAmt <= p.stack * 0.15){
       action = 'call'; // cheap to see
-    } else if (bluff && p.stack > callAmt * 3 && G.stage !== 'preflop'){
+    } else if (bluff && p.stack > callAmt * 3 && G.stage !== 'preflop' && !p.acted){
       action = 'raise';
       amount = betTarget(p, G.currentBet + Math.max(G.minRaise, Math.round(potBefore * 0.6)));
       if (amount <= G.currentBet){ action = 'fold'; }
@@ -653,7 +672,9 @@ function renderControls(p){
   const canCheck = callAmt === 0;
   const maxRaiseTotal = p.bet + p.stack;
   const minRaiseTotal = Math.min(G.currentBet + G.minRaise, maxRaiseTotal);
-  const canRaise = p.stack > callAmt; // has chips beyond a call
+  // Has chips beyond a call, and action is open to raising: a player who has
+  // already acted may only re-raise if a full raise reopened the betting (§16).
+  const canRaise = p.stack > callAmt && !p.acted;
 
   // Raise slider
   if (canRaise){
@@ -804,20 +825,32 @@ function wireSeg(segId, key, cast, cb){
   });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('modeSeg').addEventListener('click', e => {
-    const btn = e.target.closest('button'); if (!btn) return;
-    document.querySelectorAll('#modeSeg button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    cfg.mode = btn.dataset.mode;
-    document.getElementById('opponentsField').style.display = cfg.mode === 'ai' ? '' : 'none';
-    document.getElementById('humansField').style.display = cfg.mode === 'pass' ? '' : 'none';
-  });
-  wireSeg('oppSeg', 'opponents', Number);
-  wireSeg('humanSeg', 'humans', Number);
-  wireSeg('stackSeg', 'stack', Number);
-  wireSeg('blindSeg', 'blind', Number);
+if (typeof document !== 'undefined'){
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('modeSeg').addEventListener('click', e => {
+      const btn = e.target.closest('button'); if (!btn) return;
+      document.querySelectorAll('#modeSeg button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      cfg.mode = btn.dataset.mode;
+      document.getElementById('opponentsField').style.display = cfg.mode === 'ai' ? '' : 'none';
+      document.getElementById('humansField').style.display = cfg.mode === 'pass' ? '' : 'none';
+    });
+    wireSeg('oppSeg', 'opponents', Number);
+    wireSeg('humanSeg', 'humans', Number);
+    wireSeg('stackSeg', 'stack', Number);
+    wireSeg('blindSeg', 'blind', Number);
 
-  document.getElementById('startBtn').onclick = () => startGame({ ...cfg });
-  document.getElementById('menuBtn').onclick = showMenu;
-});
+    document.getElementById('startBtn').onclick = () => startGame({ ...cfg });
+    document.getElementById('menuBtn').onclick = showMenu;
+  });
+}
+
+// Export the engine for Node-based automated tests (no effect in the browser).
+if (typeof module !== 'undefined' && module.exports){
+  module.exports = {
+    makeDeck, shuffle, cardKey, eval5, bestHand, bestOf7, cmpScore, handName,
+    estimateEquity, combos, buildPots, computePayouts, orderFromDealer,
+    applyAction, needsToAct, nextActor, bettingComplete, postBlind,
+    G, SUITS, RANKS,
+  };
+}

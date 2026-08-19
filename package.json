@@ -1,0 +1,17 @@
+{
+  "name": "pocket-poker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Online multiplayer Texas Hold'em — play with friends across devices, or vs AI / pass-and-play offline.",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "test": "node tests.js && node server/engine.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

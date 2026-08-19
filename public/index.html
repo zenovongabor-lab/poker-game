@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0b3d2e" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>Pocket Poker — Online</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="conn">Reconnecting…</div>
+<div id="app">
+
+  <!-- HOME -->
+  <section id="home" class="screen active">
+    <div class="home-inner">
+      <div class="logo">
+        <div class="logo-suits"><span class="s-red">&hearts;</span><span>&spades;</span><span class="s-red">&diams;</span><span>&clubs;</span></div>
+        <h1>Pocket Poker</h1>
+        <p class="tagline">Play Texas Hold'em with friends, anywhere</p>
+      </div>
+
+      <div class="card-panel">
+        <label class="field">
+          <span>Your name</span>
+          <input id="nameInput" type="text" maxlength="16" placeholder="e.g. Alex" autocomplete="off" />
+        </label>
+
+        <label class="field">
+          <span>Join a table</span>
+          <input id="joinCode" class="code-input" type="text" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters" />
+        </label>
+        <button id="joinBtn" class="btn-ghost">Join Table</button>
+
+        <div class="or">or start your own</div>
+
+        <label class="field">
+          <span>Small blind</span>
+          <div class="seg" id="blindSeg">
+            <button data-blind="5">5</button><button data-blind="10" class="active">10</button><button data-blind="25">25</button>
+          </div>
+        </label>
+        <label class="field">
+          <span>Starting chips</span>
+          <div class="seg" id="stackSeg">
+            <button data-stack="500">500</button><button data-stack="1000" class="active">1,000</button><button data-stack="2500">2,500</button>
+          </div>
+        </label>
+        <button id="createBtn" class="btn-primary big">Create Table</button>
+      </div>
+
+      <button id="offlineBtn" class="offline-link">Play offline instead (vs AI / pass &amp; play)</button>
+      <p class="hint">Share the 4-letter code with friends. Everyone opens this page, taps <b>Join</b>, and you're at the same table — each seeing only their own cards.</p>
+    </div>
+  </section>
+
+  <!-- LOBBY -->
+  <section id="lobby" class="screen">
+    <div class="lobby-inner">
+      <div class="room-code">
+        <div class="lbl">TABLE CODE</div>
+        <div class="code" id="lobbyCode">----</div>
+        <div class="sub" id="lobbyBlinds"></div>
+        <button id="copyBtn" class="copy-btn">Copy invite link</button>
+      </div>
+      <div class="plist" id="lobbyPlayers"></div>
+      <div class="lobby-actions" id="lobbyActions"></div>
+      <div class="waiting-note" id="lobbyNote"></div>
+    </div>
+  </section>
+
+  <!-- TABLE -->
+  <section id="table" class="screen">
+    <div class="table-top">
+      <button id="menuBtn" class="icon-btn" title="Menu">&#9776;</button>
+      <div class="pot-display"><div class="pot-label">POT</div><div class="pot-amount" id="potAmount">0</div></div>
+      <div class="stage-badge" id="stageBadge">—</div>
+    </div>
+    <div class="felt">
+      <div class="board" id="board"></div>
+      <div class="seats" id="seats"></div>
+      <div id="tableMsg" class="table-msg"></div>
+    </div>
+    <div class="you" id="youSeat"></div>
+    <div class="controls" id="controls"></div>
+  </section>
+
+  <div id="modal" class="modal-overlay"><div class="modal-box"><div id="modalBody"></div></div></div>
+</div>
+<script src="client.js"></script>
+</body>
+</html>

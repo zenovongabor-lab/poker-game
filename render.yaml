@@ -1,0 +1,13 @@
+# One-click deploy blueprint for Render (https://render.com).
+# In Render: New + → Blueprint → connect this repo → Apply.
+services:
+  - type: web
+    name: pocket-poker
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "20"

@@ -1,93 +1,98 @@
 # 🂡 Pocket Poker
 
-A polished, mobile-first **Texas Hold'em** game you can play right in the browser —
-against the computer or against the person sitting next to you.
+Texas Hold'em you can actually play with friends — **online across devices**, or
+offline against AI / pass-and-play on a single phone. No accounts, no installs.
 
-No installs, no accounts, no build step. Just open `index.html`.
+## Two ways to play
 
-## Play
+### 🌐 Online multiplayer (play with friends over the internet)
+Everyone opens the site, one person taps **Create Table** and shares the 4-letter
+code; friends tap **Join**. You're all at the same table from your own phones, and
+**each person sees only their own hole cards** — the deck lives on the server, so
+nobody can peek at anyone else's hand. Fill empty seats with **bots** if you're a
+player short. Reconnect and your seat is still there.
 
-- **On your phone:** open `index.html` in any mobile browser (or host the folder anywhere static).
-- **On desktop:** open `index.html` directly.
+This mode needs the small **Node server** in this repo running somewhere (see
+[Deploy](#deploy-the-online-server) below).
 
-## Modes
+### 📱 Offline (no server needed)
+`offline.html` (and the repo root) is a single self-contained page: play against
+**1–3 AI opponents**, or **pass-and-play** where 2–4 people share one phone and tap
+*Peek* to see their cards privately. This works from any static host (e.g. GitHub
+Pages) — no server required.
 
-### 🤖 vs AI
-Play heads-up or against up to 3 AI opponents. Each bot estimates its real win
-probability with a Monte-Carlo equity simulation on every decision, mixes in pot
-odds, and bluffs occasionally — so it calls, folds, value-bets and check-raises
-like a real (if imperfect) opponent rather than following a fixed script.
+## Run it locally
 
-### 👥 Pass & Play
-Two to four people share a single phone. Between turns the screen blanks with a
-**"Pass the phone to …"** hand-off, and each player taps **Peek** to privately see
-their own hole cards. Everything is revealed at showdown.
+```bash
+npm install
+npm start
+# open http://localhost:3000  — create a table, add a bot, Deal In
+```
+
+Open the same URL in a second browser/tab (or another device on your network) and
+join with the code to see real multiplayer.
+
+## Deploy the online server
+
+The online mode is a tiny Node app (`server/server.js`, ~1 dependency) that serves
+the web client **and** runs the WebSocket game. Any host that runs Node works. This
+repo includes a **Render** blueprint for a near one-click deploy:
+
+1. Push this repo to GitHub (already done).
+2. Go to **[render.com](https://render.com)** → **New +** → **Blueprint** →
+   connect this repository → **Apply**. Render reads `render.yaml` and deploys.
+3. When it's live you'll get a URL like `https://pocket-poker.onrender.com` — share
+   that with friends. That's your online table.
+
+Any equivalent host (Railway, Fly.io, a VPS) works too — the start command is just
+`npm start` and it listens on `$PORT`. Free tiers may sleep when idle, so the first
+visit after a while can take a few seconds to wake.
+
+> GitHub Pages can host the **offline** game (static files), but **not** the online
+> mode — Pages can't run a server, and hidden cards require one.
+
+## How online stays fair
+
+The server is authoritative: it holds the shuffled deck and every hole card, runs
+all betting and showdown logic, and sends each connected player a **redacted** view
+containing only their own cards (opponents show as face-down until showdown). Clients
+can't see or forge state they weren't given. Turn timers auto-check/fold idle
+players, and disconnects keep your seat for reconnection.
 
 ## Full Texas Hold'em rules
 
-- Small/big blinds with a rotating dealer button (heads-up blind rules handled correctly)
-- Pre-flop, flop, turn and river betting rounds
-- Fold / check / call / bet / raise, with a bet slider and ½-pot, pot, 2×-pot and all-in presets
-- Minimum-raise enforcement and re-opened action on raises
-- **All-in handling with correct side pots** and uncalled-bet refunds
-- Proper 5-of-7 hand evaluation (straight flushes down to high card, including the wheel)
-- Odd-chip and split-pot distribution
+- Small/big blinds with a rotating dealer button (correct heads-up rules)
+- Pre-flop, flop, turn, river betting; fold / check / call / bet / raise with a bet slider and pot-fraction presets
+- Minimum-raise enforcement, and a **short all-in does not reopen** betting for players who already acted
+- **All-in run-outs with correct side pots** and uncalled-bet returns
+- Best 5-of-7 hand evaluation (straight flushes down to high card, including the wheel), exact tie-breaks, dealer-relative odd-chip splits
 
-## Configuration
+## Project layout
 
-From the home screen you choose the mode, number of opponents/players, starting
-stack (500 / 1,000 / 2,500) and the small blind (5 / 10 / 25). The big blind is
-twice the small blind. Play continues until one player holds all the chips.
-
-## Files
-
-| File | Purpose |
+| Path | Purpose |
 |------|---------|
-| `index.html` | Markup and screen structure |
-| `style.css`  | All styling (mobile-first, safe-area aware, dark felt theme) |
-| `game.js`    | Game engine, hand evaluator, AI, and UI logic — no dependencies |
-| `tests.js`   | Automated test suite (run with Node) |
+| `server/server.js` | Online server: static hosting + WebSocket rooms |
+| `server/engine.js` | Authoritative game engine (cards, evaluation, betting, side pots) |
+| `public/` | Online web client (`index.html`, `style.css`, `client.js`) + bundled `offline.html` |
+| `index.html`, `style.css`, `game.js` | The standalone offline game (also served at `public/offline.html`) |
+| `tests.js`, `server/engine.test.js` | Automated test suites |
 
 ## Testing
 
 ```bash
-node tests.js
+npm test          # runs both suites
 ```
 
-The suite validates the engine against a full Texas Hold'em ruleset:
+- **`tests.js`** (79 assertions) — deck integrity, every hand category and tie-break,
+  the ace-low wheel, best-5-of-7 (0/1/2 hole cards, board plays), side pots and splits,
+  dealer-relative odd chips, betting incl. short-all-in reopening, card/chip invariants,
+  and a full `C(52,5)` enumeration matching the exact 5-card hand frequencies.
+- **`server/engine.test.js`** (23 assertions) — multi-player hands to completion with
+  chip conservation, **hidden-card redaction**, fold-to-one, all-in run-outs with side
+  pots, and turn enforcement.
 
-- **Deck** — 52 unique cards, correct 4×13 structure, shuffle preserves the deck,
-  first-card distribution is roughly uniform (unbiased Fisher–Yates).
-- **Hand evaluation** — every category is recognised and correctly ordered, with
-  exhaustive tie-break checks (kickers, full-house trips-first, quad kickers, flush
-  ordering) and the ace-low **wheel** (`A-2-3-4-5` is five-high; `6-5-4-3-2` beats it).
-  Suits never break ties.
-- **Best 5 of 7** — board-plays, and hands using two / one / zero hole cards.
-- **Side pots** — main/side splits, folded contributors, multiple all-in levels,
-  tied side pots with a different main-pot winner, and chip conservation across
-  5,000 randomised settlements.
-- **Odd chips** — a genuinely indivisible split awards the extra chip to the seat
-  closest clockwise from the dealer, and follows the button when it moves.
-- **Betting** — check/bet/call/raise/re-raise/fold/all-in, minimum-raise tracking,
-  and the rule that a **short all-in does not reopen betting** for players who have
-  already acted.
-- **Exact frequencies** — a full enumeration of all `C(52,5) = 2,598,960` hands is
-  categorised by the evaluator and checked against the known combinatorial counts
-  (4 royal flushes, 624 quads, 1,302,540 high-card hands, …). This is the definitive
-  correctness check for the hand evaluator.
+Plus end-to-end checks over real WebSocket connections (no card leaks, chips conserved,
+bots act, reconnection restores seats) and headless-browser playthroughs of both clients.
 
-Beyond the unit suite, the game is exercised end-to-end in a headless browser —
-full games are played to completion in both modes, asserting no runtime errors and
-that total chips are conserved on every step.
-
-## Under the hood
-
-- **Hand evaluation** — evaluates the best 5-card hand from any 5–7 cards and returns
-  a comparable score array for exact tie-breaking.
-- **AI equity** — `estimateEquity()` runs a few hundred Monte-Carlo rollouts against
-  random opponent holdings given the current board.
-- **Betting engine** — a small state machine drives street progression, blind posting,
-  action re-opening, and all-in run-outs, with chip conservation guaranteed (verified by
-  fuzz tests and full-game browser playthroughs).
-
-Everything is vanilla JavaScript — no frameworks, no network calls, no external assets.
+Everything is vanilla JavaScript. The only runtime dependency is `ws` (WebSocket) for
+the server; the browser clients use no frameworks and load no external assets.
